@@ -245,22 +245,25 @@ impl SavedModel {
             let ids = |key: &str, len: usize| -> Result<Vec<usize>> {
                 s.get(key).and_then(Json::as_array).ok_or_else(|| bad("saved model: state"))?.iter().map(|i| index(Some(i), len)).collect()
             };
-            let mut st = ModelState::default();
-            st.bodies = ids("bodies", model_bodies.len())?.into_iter().filter_map(|i| model_bodies.get(i).cloned()).collect();
-            st.sketches = ids("sketches", sketches.len())?.into_iter().filter_map(|i| sketches.get(i).cloned()).collect();
-            st.body_counter = index(s.get("body_counter"), usize::MAX)?;
             let field = |key: &str| parse(s.get(key));
             let invalid = |_| bad("saved model: state");
-            st.sheets = serde_json::from_value(field("sheets")?).map_err(invalid)?;
-            st.construct = serde_json::from_value(field("construct")?).map_err(invalid)?;
-            st.threads = serde_json::from_value(field("threads")?).map_err(invalid)?;
-            st.blend_edges = serde_json::from_value(field("blend_edges")?).map_err(invalid)?;
-            st.fitted = serde_json::from_value(field("fitted")?).map_err(invalid)?;
-            st.tapered = serde_json::from_value(field("tapered")?).map_err(invalid)?;
+            let mut sketch_keys = BTreeMap::new();
             for k in s.get("sketch_keys").and_then(Json::as_array).ok_or_else(|| bad("saved model: state"))? {
-                st.sketch_keys
+                sketch_keys
                     .insert(k.get(0).and_then(Json::as_u64).ok_or_else(|| bad("saved model: state"))?, unhex(k.get(1).unwrap_or(&Json::Null))?);
             }
+            let st = ModelState {
+                bodies: ids("bodies", model_bodies.len())?.into_iter().filter_map(|i| model_bodies.get(i).cloned()).collect(),
+                sketches: ids("sketches", sketches.len())?.into_iter().filter_map(|i| sketches.get(i).cloned()).collect(),
+                body_counter: index(s.get("body_counter"), usize::MAX)?,
+                sheets: serde_json::from_value(field("sheets")?).map_err(invalid)?,
+                construct: serde_json::from_value(field("construct")?).map_err(invalid)?,
+                threads: serde_json::from_value(field("threads")?).map_err(invalid)?,
+                sketch_keys,
+                blend_edges: serde_json::from_value(field("blend_edges")?).map_err(invalid)?,
+                fitted: serde_json::from_value(field("fitted")?).map_err(invalid)?,
+                tapered: serde_json::from_value(field("tapered")?).map_err(invalid)?,
+            };
             states.push(Arc::new(st));
         }
         Ok(states)
