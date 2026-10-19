@@ -4,9 +4,10 @@ use super::*;
 use solidcraft_doc::Operation;
 
 const TIMELINE: &str = "2F4C1849-1A5A-4F6C-A086-8DD445CBF94B";
-const SKETCH: &str = "8DA771B7-52ED-42FC-94E2-2353FE141373";
+pub(super) const SKETCH: &str = "8DA771B7-52ED-42FC-94E2-2353FE141373";
 const EXTRUDE: &str = "DD405BC2-D673-44F0-8833-5CB2A1C186C7";
 const GEOMETRY: &str = "44A64366-4BD3-4B24-881A-F94C206E8F2D";
+const SKETCH_CONTEXT: &str = "5275CBA4-3D7D-40DC-A651-1DFF3FC8AFBF";
 const TRANSFORM: &str = "F47A46FB-DA27-4AFA-8A72-1B38FA596E23";
 
 #[derive(Debug, PartialEq)]
@@ -158,7 +159,11 @@ impl Design {
                             r.u32()?; // evaluation state, not timeline position
                             zeros(&mut r, 1)?;
                             let geometry = r.reference()?;
-                            require_class(&classes, geometry, GEOMETRY, version + 13)?;
+                            // A sketch feature keeps its version when its geometry is upgraded:
+                            // v4 features are observed over both v17 and v18 geometry.
+                            let geometry_version = classes.get(&geometry).map_or(0, |c| c.version);
+                            let geometry_version = if geometry_version > version + 13 { geometry_version.min(18) } else { version + 13 };
+                            require_class(&classes, geometry, GEOMETRY, geometry_version)?;
                             let plane = r.reference()?;
                             validate_refs(&classes, &[plane])?;
                             if version >= 5 {
@@ -173,7 +178,7 @@ impl Design {
                             if version >= 4 {
                                 zeros(&mut r, 4)?;
                             }
-                            let (mut placement, name) = placement(&records, &classes, geometry, version + 13)?;
+                            let (mut placement, name) = placement(&records, &classes, geometry, geometry_version)?;
                             placement.support = plane;
                             placement.projections = projections;
                             (HistoryKind::Sketch { geometry, placement }, name)
@@ -493,16 +498,23 @@ fn placement(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, geometry: u
     empty(&mut r)?;
     let transform = r.reference()?;
     require_class(classes, transform, TRANSFORM, 0)?;
-    r.take(if version == 18 { 17 } else { 6 })?;
+    r.take(6)?;
+    // Version 18 and later version-17 streams add a reference to the design's
+    // 5275CBA4 object here; earlier version-17 streams continue with the name.
+    let mut probe = Reader { bytes: r.bytes, at: r.at };
+    let shared = probe.reference().ok().and_then(|id| classes.get(&id)).is_some_and(|c| c.id == SKETCH_CONTEXT && c.version == 4);
+    if version == 18 || shared {
+        r.take(11)?;
+    }
     let name = r.wide_string()?;
     zeros(&mut r, 1)?;
     let entities = references(&mut r)?;
     validate_refs(classes, &entities)?;
     let mut legacy_entity_metadata = Vec::new();
-    // Legacy v17 appears both with an extension table and with only the final
-    // marked parent reference (the knob corpus). The record boundary makes the
-    // latter unambiguous; never interpret that reference as a u32 table count.
-    if version == 17 && r.bytes.len().saturating_sub(r.at) != 11 {
+    // v17 and v18 appear both with an extension table (possibly empty) and with
+    // only the final marked parent reference (the knob corpus). The record boundary
+    // makes the latter unambiguous; never interpret that reference as a u32 table count.
+    if matches!(version, 17 | 18) && r.bytes.len().saturating_sub(r.at) != 11 {
         for _ in 0..r.count(15)? {
             let id = r.reference()?;
             validate_refs(classes, &[id])?;
@@ -557,6 +569,15 @@ pub(super) fn zeros(r: &mut Reader<'_>, n: usize) -> Result<()> {
     let at = r.at;
     if r.take(n)?.iter().any(|b| *b != 0) {
         return Err(invalid(&format!("unsupported history flags at record byte {at} ({n} bytes)")));
+    }
+    Ok(())
+}
+/// The u32 after a selection type is 0 in most files and 1 throughout files whose
+/// design stream header carries flag 1. The fields after it are unchanged.
+pub(super) fn selection_flag(r: &mut Reader<'_>) -> Result<()> {
+    let at = r.at;
+    if r.u32()? > 1 {
+        return Err(invalid(&format!("unsupported selection flag at record byte {at}")));
     }
     Ok(())
 }

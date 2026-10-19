@@ -584,7 +584,7 @@ pub(super) fn face(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id: u
     if r.u32()? != 2 {
         return Err(invalid("unsupported loft face selection type"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     let [cached] = cached.as_slice() else {
         return Err(invalid("loft face requires one cached identity"));
@@ -729,7 +729,7 @@ fn selected_body(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id: u64
     if r.u32()? != 2 {
         return Err(invalid("unsupported loft target selection type"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     if combine {
         for cached in references(&mut r)? {
             require_class(classes, cached, "C46D3EEB-40E1-43FA-83DC-9CB204335417", 1)?;

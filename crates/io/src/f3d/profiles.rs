@@ -90,8 +90,11 @@ impl Design {
                 let tail = bytes.len().checked_sub(11).filter(|at| *at >= r.at).ok_or_else(|| invalid("truncated profile tail"))?;
                 let mut end = Reader { bytes: bytes.get(tail..).ok_or_else(|| invalid("profile tail"))?, at: 0 };
                 let feature = end.reference()?;
+                // A sketch owns the profiles it selects for projection; no extrusion consumes them.
                 if !classes.get(&feature).is_some_and(|c| {
-                    (c.id == "DD405BC2-D673-44F0-8833-5CB2A1C186C7" && c.version == 8) || (c.id == super::lofts::CLASS && c.version == 9)
+                    (c.id == "DD405BC2-D673-44F0-8833-5CB2A1C186C7" && c.version == 8)
+                        || (c.id == super::lofts::CLASS && c.version == 9)
+                        || (c.id == super::history::SKETCH && matches!(c.version, 3..=5))
                 }) {
                     return Err(invalid("unsupported profile owning feature"));
                 }

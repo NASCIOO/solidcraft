@@ -106,6 +106,30 @@ fn resaved_legacy_design_header_uses_modern_descriptor() {
 }
 
 #[test]
+fn design_header_flag_admits_zero_and_one_only() {
+    for layout in [4, 5, 8] {
+        let (mut meta, bulk) = streams(layout);
+        let mut r = Reader { bytes: &meta, at: 0 };
+        r.string().unwrap();
+        let at = r.at;
+        for (flag, admitted) in [(0u32, true), (1, true), (2, false), (u32::MAX, false)] {
+            meta[at..at + 4].copy_from_slice(&flag.to_le_bytes());
+            assert_eq!(index("flag".into(), meta.clone(), bulk.clone()).is_ok(), admitted, "layout {layout}, flag {flag}");
+        }
+    }
+}
+
+#[test]
+fn selection_flag_admits_zero_and_one_only() {
+    for (flag, admitted) in [(0u32, true), (1, true), (2, false), (u32::MAX, false)] {
+        let bytes = flag.to_le_bytes();
+        let mut r = Reader { bytes: &bytes, at: 0 };
+        assert_eq!(history::selection_flag(&mut r).is_ok(), admitted, "flag {flag}");
+    }
+    assert!(history::selection_flag(&mut Reader { bytes: &[1, 0], at: 0 }).is_err());
+}
+
+#[test]
 fn truncated_and_corrupt_indexes_fail_without_panicking() {
     let (meta, bulk) = streams(5);
     for end in 0..meta.len() {

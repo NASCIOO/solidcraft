@@ -43,7 +43,7 @@ pub(super) fn decode(
     if r.u32()? != 2 {
         return Err(invalid("unsupported chamfer cap selection mode"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     let [cached] = cached.as_slice() else { return Err(invalid("chamfer cap requires one cached circle")) };
     require_class(classes, *cached, "B0B3FA59-C374-444F-B424-24AA5DE41645", 0)?;

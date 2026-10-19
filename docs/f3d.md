@@ -60,7 +60,8 @@ extracted. None of the Fusion-produced files is copied into this repository.
 
 Observed metadata layout (little-endian integers):
 
-1. Length-prefixed UTF-8 `Design`, an empty string, and a length-prefixed UTF-16
+1. Length-prefixed UTF-8 `Design`, a u32 flag (0 in most streams, 1 in some
+   layout-5 streams; retained, not interpreted), and a length-prefixed UTF-16
    identity; two u32 values (build tag and layout), then `Design`, 0, 1, 0.
 2. A u32-counted class table: identity string, parent string, u32 version, group
    string, and a u32-counted array of u64 object IDs for each class.
@@ -2298,7 +2299,7 @@ The desktop opening flow offers **Prefer editability** and **Prefer correctness*
 Editability attempts supported timeline records individually and rolls back a
 feature whose reconstruction or regeneration fails. Its independent successors
 can still be attempted. Correctness first attempts native bodies through cadmpeg
-0.6.1 and the STEP importer, falling back to partial history on failure. This is
+0.6.2 and the STEP importer, falling back to partial history on failure. This is
 a preference, not a certificate of final-shape accuracy. Decoder and conversion
 losses, omitted features, and empty recovery are shown in a scrollable report and
 retained as `import_warnings` in saved designs.
@@ -2309,12 +2310,18 @@ editable history; programmatic calls never prompt. Unsupported features can be
 omitted in recovery modes. Invalid archives, unsafe paths, checksums and bounded
 resource limits remain errors. Web builds currently recover history only.
 
-The native decoder's default **16,000,000 collection-item budget** is a software
-limit from cadmpeg, not SolidCraft's geometry kernel and not a measurement of
-available RAM. Collection accounting includes SAB tokens, not just CAD features.
-The adapter uses 64,000,000 items and retains independent byte, work and recursion
-ceilings. Raising this cap can require more memory and CPU; it does not fix
-unsupported schemas or establish geometry correctness.
+Native body recovery keeps cadmpeg's byte, retention, entity and recursion
+ceilings (cadmpeg 0.6.2 no longer has a collection-item budget). A history stream
+that exceeds cadmpeg's local history-binding work cap keeps its final bodies
+without historical topology and is reported as a decoder loss; SolidCraft no
+longer rewrites the archive to retry without history. Zero-angle cones from
+native B-reps (circular or elliptic cylinders) are written as cylindrical
+surfaces or linear extrusions of an ellipse by cadmpeg 0.6.2. Procedural curves and surfaces
+are written as their cached approximations, whose fit tolerance (4.4 µm in one
+supplied design) can exceed the model tolerance (0.01 µm). The model uncertainty
+declared to the STEP importer is raised to the largest such fit tolerance, so vertices
+within it no longer split a recovered body into an open shell; ordinary STEP imports are
+unchanged.
 
 The opt-in `supplied_archives_recover_with_both_preferences` gate opens the local
 corpus in both modes, checks regeneration and save/reopen volume stability, and
@@ -3004,3 +3011,48 @@ local opt-in tests check the supplied records and eight controlled archives.
 The face controls contain two byte-identical bounded selection identities for
 one selected face; equality is checked across the complete identity graph.
 The ordinary I/O suite passes 323 tests, with 36 local opt-in tests excluded.
+
+## Header flag 1 streams and later layout-5 generations — 2026-10-19
+
+A user-supplied set of 26 designs (layouts 5, 7 and 8; builds from 0x8004be2 to
+0x800542e and 0x4d2) showed these additional generations of known records. In each case
+the fields that follow match the documented layouts; every variant has an original
+authored test that also refuses the neighbouring values.
+
+- **Design header flag.** The u32 after the design segment name is 1, not 0, in all
+  layout-8 designs and in one layout-5 design. Values other than 0 and 1 are refused.
+- **Selection flag.** In those same streams every selector carries 1, not 0, in the
+  u32 after its selection type (127 of 127 in one design). The selector readers share
+  one rule: loft faces and targets, body edges, projected faces, plane tracking,
+  construction points, fillet edges, chamfer and composite caps and joined blends.
+- **Sketch placements.** Version-4 sketch features also appear over v18 geometry; the
+  geometry class version, not the feature version, selects the placement layout. v18
+  placements and entity records may carry the v17 extension tables (empty here) before
+  the owning reference, which the record boundary keeps unambiguous. Later v17 streams
+  (builds 0x80051d4 and 0x80051ea) keep the v18 reference to the design's
+  `5275CBA4-3D7D-40DC-A651-1DFF3FC8AFBF` v4 object in the placement; earlier v17
+  streams omit it. The reader recognises the reference by its target class, not by
+  the build.
+- **Sketch projections v3.** Version 3 matches version 4 except for a two-byte
+  evaluation state, and its inherited metadata is 41 or 42 bytes (one optional byte
+  before its second reference), bounded by the final owner reference. 470 of 484
+  observed v3 records follow this layout; the other 14 carry a 0 mapping flag and are
+  still refused.
+- **Root component.** Single-component designs carry component class versions 19, 20
+  and 21 as well as 18 and 23. Only the root identity is read, and a second component
+  is still refused.
+- **Sketch-owned profiles.** A sketch owns the profiles it selects for projection.
+  They are retained like extrusion and loft profiles; no feature consumes them.
+- **Face-attached v8 planes** show the second marker placement already known for
+  version 15, eight bytes earlier (offset 10); with that placement the evaluation tail
+  keeps its full 60 bytes.
+
+Effect on the 26 designs: two sketch-only designs now open with complete strict
+history (none did before), and editable features recovered under Prefer editability
+rose in at least eight others (for example 0 to 4 sketches in three sketch-only designs). Every
+design that recovered native bodies before still does. The remaining failures are
+semantic rather than layout differences and stay explicit: construction planes with
+other methods (`D869265F` binding byte 1 to 9), two-sided (direction 2) and extent-type
+0 extrusions, edge recipes of non-rectangular extrusions, driven parameter
+measurements, a layout-7 archive and unsupported feature classes
+(`D7015B81` v4, `D087EFE5` v0, `FCBB1707` v5, `1C037A07` v7, `D1728651` v0).

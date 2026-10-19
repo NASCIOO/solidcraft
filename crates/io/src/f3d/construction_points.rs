@@ -143,7 +143,7 @@ pub(super) fn sketch_edge(records: &Records<'_>, classes: &BTreeMap<u64, &Class>
     if r.u32()? != 1 || r.wide_string()?.is_empty() || r.wide_string()?.is_empty() || r.u32()? != 2 {
         return Err(invalid("unsupported construction-point sketch selection"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     for cached in references(&mut r)? {
         require_class(classes, cached, "50AEE8B4-9456-4DD7-847D-6F6C909BBB9D", 0)?;
     }

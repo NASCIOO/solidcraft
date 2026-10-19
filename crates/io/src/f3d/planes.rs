@@ -84,10 +84,13 @@ fn raw_definition(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id: u6
         .ok_or_else(|| invalid("unsupported plane definition class"))?;
     let mut r = payload(records.primary(id)?, id)?;
     empty(&mut r)?;
+    let mut early_marker = false;
     let extra = if version == 8 {
         // Original layout-5 offset planes have no extra-offset slot; the
         // current public-API resave adds the version-15 header and null slot.
-        plane_header(&mut r, 31, &[18], attached)?;
+        // Like version 15, face attachments carry the marker in one of two
+        // placements eight bytes apart; the earlier one keeps the full evaluation tail.
+        early_marker = plane_header(&mut r, 31, &[10, 18], attached)? == Some(10);
         None
     } else {
         // Current files have two observed face marker placements, including
@@ -135,15 +138,16 @@ fn raw_definition(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id: u6
     let bases = references(&mut r)?;
     let [base] = bases.as_slice() else { return Err(invalid("unsupported plane base references")) };
     zeros(&mut r, 2)?;
-    let tail = if attached && version == 8 { 59 } else { 60 };
+    let tail = if attached && version == 8 && !early_marker { 59 } else { 60 };
     evaluation_tail(&mut r, classes, owner, tail)?;
     Ok(Definition { base: *base, distance, extra, plane })
 }
 
-fn plane_header(r: &mut Reader<'_>, length: usize, flags: &[usize], attached: bool) -> Result<()> {
+/// Returns the face marker placement, if the header carries one.
+fn plane_header(r: &mut Reader<'_>, length: usize, flags: &[usize], attached: bool) -> Result<Option<usize>> {
     let bytes = r.take(length)?;
     if bytes.iter().all(|b| *b == 0) {
-        return Ok(());
+        return Ok(None);
     }
     if attached {
         for flag in flags {
@@ -151,7 +155,7 @@ fn plane_header(r: &mut Reader<'_>, length: usize, flags: &[usize], attached: bo
             let field = face.get_mut(*flag..*flag + 8).ok_or_else(|| invalid("invalid plane header schema"))?;
             field.copy_from_slice(&1_f64.to_le_bytes());
             if bytes == face {
-                return Ok(());
+                return Ok(Some(*flag));
             }
         }
     }
@@ -213,7 +217,7 @@ pub(super) fn tracked_entity(records: &Records<'_>, classes: &BTreeMap<u64, &Cla
     if r.u32()? != 2 {
         return Err(invalid("unsupported plane tracking kind"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let version = records
         .design
         .classes
@@ -291,4 +295,49 @@ pub(super) fn same_surface(a: Plane, b: Plane) -> bool {
 
 pub(super) fn same_support_plane(a: Plane, b: Plane) -> bool {
     (a.origin - b.origin).dot(a.normal()).abs() < 1e-7 && (a.normal() - b.normal()).len() < 1e-9
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::f3d::import_tests::Fixture;
+    use crate::f3d::relationship_tests::{reference, refs, u32};
+
+    /// Original version-8 definition with a face marker at `marker` and an
+    /// evaluation tail of `tail` bytes.
+    fn attached(marker: Option<usize>, tail: usize) -> Design {
+        let mut b = vec![0; 4];
+        let mut header = [0; 31];
+        if let Some(at) = marker {
+            header[at..at + 8].copy_from_slice(&1_f64.to_le_bytes());
+        }
+        b.extend(header);
+        b.push(1); // identity transform
+        b.extend([0; 35]);
+        u32(&mut b, 2);
+        refs(&mut b, &[]);
+        refs(&mut b, &[11]);
+        b.extend([0; 2]);
+        refs(&mut b, &[]);
+        b.extend(vec![0; tail]);
+        reference(&mut b, 12);
+        let mut f = Fixture(BTreeMap::new());
+        f.put(10, DEFINITION, 8, b, None);
+        f.put(11, "5A1BF548-241F-46FD-9FB5-E4B05126EB9D", 1, vec![], None);
+        f.put(12, "8DA771B7-52ED-42FC-94E2-2353FE141373", 4, vec![], None);
+        f.design()
+    }
+
+    #[test]
+    fn version_8_face_markers_select_their_evaluation_tail() {
+        for (marker, tail, admitted) in
+            [(Some(18), 59, true), (Some(18), 60, false), (Some(10), 60, true), (Some(10), 59, false), (Some(14), 60, false), (None, 59, true)]
+        {
+            let d = attached(marker, tail);
+            let records = Records::new(&d);
+            let classes = d.classes.iter().flat_map(|c| c.objects.iter().map(move |id| (*id, c))).collect();
+            let result = raw_definition(&records, &classes, 10, 12, true).map(|_| ());
+            assert_eq!(result.is_ok(), admitted, "marker {marker:?}, tail {tail}: {result:?}");
+        }
+    }
 }

@@ -151,20 +151,20 @@ pub(super) fn version(classes: &BTreeMap<u64, &Class>, id: u64) -> Result<u32> {
 
 pub(super) fn decode(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id: u64, owner: u64) -> Result<Vec<Projection>> {
     let version = version(classes, id)?;
-    if !matches!(version, 1 | 4) {
-        return Err(invalid("unsupported projection record layout"));
-    }
     let mut r = payload(records.primary(id)?, id)?;
     empty(&mut r)?;
     zeros(&mut r, 2)?;
-    if version == 4 {
-        r.take(3)?; // evaluation state
-    }
+    // Version 3 matches version 4 except for a two-byte evaluation state.
+    r.take(match version {
+        1 => 0,
+        3 => 2,
+        _ => 3,
+    })?; // evaluation state
     if r.take(1)? != [1] {
         return Err(invalid("unsupported projection mapping flag"));
     }
     let mapping = r.reference()?;
-    if version == 4 {
+    if version >= 3 {
         // Automatic face-boundary projections and explicit projections both
         // retain the same selector/tracker relationship and linked entities.
         if !matches!(r.take(1)?, [0] | [1]) {
@@ -176,11 +176,21 @@ pub(super) fn decode(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, id:
         }
     }
     let mode = r.u32()?;
-    if !matches!((version, mode), (1, 1) | (4, 1 | 3)) || r.reference()? != owner {
+    if !matches!((version, mode), (1, 1) | (3 | 4, 1 | 3)) || r.reference()? != owner {
         return Err(invalid("unsupported sketch projection mode or owner"));
     }
     let container = r.reference()?;
-    r.take(if version == 1 { 41 } else { 42 })?; // inherited evaluation metadata
+    // Inherited evaluation metadata. Version 3 has 41 or 42 bytes (one optional
+    // leading byte before its second reference); the final owner reference bounds it.
+    let metadata = match version {
+        1 => 41,
+        3 => r.bytes.len().saturating_sub(r.at + 11),
+        _ => 42,
+    };
+    if !matches!((version, metadata), (1, 41) | (3, 41 | 42) | (4, 42)) {
+        return Err(invalid("unsupported projection metadata length"));
+    }
+    r.take(metadata)?;
     if r.reference()? != owner {
         return Err(invalid("inconsistent projection owner"));
     }

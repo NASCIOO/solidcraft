@@ -89,7 +89,7 @@ pub(super) fn decode(
     if r.u32()? != 2 {
         return Err(invalid("unsupported composite cap selector type"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     if cached.len() != mappings.len()
         || cached.iter().collect::<BTreeSet<_>>().len() != cached.len()

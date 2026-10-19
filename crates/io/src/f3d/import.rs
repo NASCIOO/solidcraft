@@ -46,8 +46,8 @@ impl Design {
         let root = components
             // Only the root's identity is used here. Origin groups and sketch
             // placement validate their owner independently; no component payload
-            // or assembly transform is inferred from either generation.
-            .filter(|c| (matches!(c.version, 18 | 23) || self.recovering()) && c.objects.len() == 1)
+            // or assembly transform is inferred from any generation (18 to 23).
+            .filter(|c| (matches!(c.version, 18..=23) || self.recovering()) && c.objects.len() == 1)
             .and_then(|c| c.objects.first())
             .copied()
             .ok_or_else(|| invalid("component/assembly reconstruction is not supported yet"))?;

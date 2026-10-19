@@ -64,7 +64,7 @@ fn decode_oriented(
     if r.u32()? != 1 || r.wide_string()?.is_empty() || r.wide_string()?.is_empty() || r.u32()? != 2 {
         return Err(invalid("invalid joined blend body selection"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     if cached.len() > 64 || cached.iter().collect::<BTreeSet<_>>().len() != cached.len() {
         return Err(invalid("invalid joined blend cache count"));

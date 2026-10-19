@@ -334,3 +334,32 @@ fn extrusion_start_offsets_keep_parameter_identity_and_follow_expressions() {
     f.0.get_mut(&9).unwrap().2[27] = 2;
     assert!(f.design().to_document("Unknown offset mode").is_err());
 }
+
+/// Retarget the reference at `at` (marker byte included) to `id`.
+fn retarget(b: &mut [u8], at: usize, id: u64) {
+    assert_eq!(b[at], 1);
+    b[at + 1..at + 9].copy_from_slice(&id.to_le_bytes());
+}
+
+#[test]
+fn profiles_selected_by_a_sketch_are_retained_without_an_extrusion() {
+    let with_owner = |owner: u64| {
+        let mut f = fixture(false);
+        let mut profile = f.0[&100].2.clone();
+        retarget(&mut profile, 6, 111);
+        let n = profile.len();
+        retarget(&mut profile, n - 11, owner);
+        let mut tracking = f.0[&101].2.clone();
+        retarget(&mut tracking, 6, 110);
+        f.put(110, "4BD53E5A-0B3E-45E5-AE8B-02044306485A", 0, profile, None);
+        f.put(111, "0D57BD2F-D09B-43FC-AD57-1E89A118C453", 1, tracking, None);
+        f.design()
+    };
+    let d = with_owner(8);
+    let profiles = d.sketch_profiles().unwrap();
+    assert!(profiles.iter().any(|p| p.id == 110 && p.feature == 8));
+    assert!(profiles.iter().any(|p| p.id == 100 && p.feature == 9));
+    volume(&d.to_document("Sketch-selected profile").unwrap(), std::f64::consts::PI * 30. * 30. * 17.);
+    // Any other owning class is still refused.
+    assert!(with_owner(67).sketch_profiles().is_err());
+}

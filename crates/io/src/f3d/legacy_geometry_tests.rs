@@ -31,12 +31,27 @@ fn legacy(mut f: Fixture, geometry: u32) -> Design {
 }
 
 fn legacy_membership(entries: &[(u64, u32)]) -> Design {
+    legacy_membership_with(entries, false)
+}
+
+/// `context`: later version-17 streams keep the v18 reference to the design's
+/// sketch context object in the placement instead of dropping it.
+fn legacy_membership_with(entries: &[(u64, u32)], context: bool) -> Design {
     let mut f = super::import_tests::fixture(false);
+    if context {
+        f.put(1002, "5275CBA4-3D7D-40DC-A651-1DFF3FC8AFBF", 4, vec![], None);
+    }
     let sketch = f.0.get_mut(&8).unwrap();
     sketch.1 = 4;
     sketch.2.drain(49..53);
     let secondary = f.0.get_mut(&70).unwrap().3.as_mut().unwrap();
-    secondary.drain(21..32);
+    if context {
+        let mut shared = Vec::new();
+        reference(&mut shared, 1002);
+        secondary.splice(21..32, shared);
+    } else {
+        secondary.drain(21..32);
+    }
     let mut table = Vec::new();
     super::relationship_tests::u32(&mut table, entries.len() as u32);
     for (id, flags) in entries {
@@ -85,6 +100,14 @@ fn complete_legacy_membership_preserves_driving_dimensions_and_saved_replay() {
     let reopened = crate::read_design(&crate::write_design(&doc)).unwrap();
     assert_eq!(doc, reopened);
     super::import_tests::volume(&reopened, std::f64::consts::PI * 20. * 20. * 20.);
+}
+
+#[test]
+fn later_legacy_placements_keep_their_sketch_context_reference() {
+    let entries = [(56, 1), (31, 1), (41, 1), (42, 1)];
+    let expected = legacy_membership(&entries).to_document("Legacy membership").unwrap();
+    let doc = legacy_membership_with(&entries, true).to_document("Legacy membership").unwrap();
+    assert_eq!(doc, expected);
 }
 
 #[test]
@@ -294,4 +317,31 @@ fn reversed_support_line_axis_preserves_endpoint_order_and_editable_profile() {
         bytes[at + i * 8..at + (i + 1) * 8].copy_from_slice(&value.to_le_bytes());
     }
     assert!(f.design().sketch_lines().is_err());
+}
+
+/// Sketch features keep version 4 when their geometry is upgraded to v18, and
+/// v18 placement and entity records may carry the v17 tables, here empty.
+#[test]
+fn version_4_sketches_over_v18_geometry_accept_empty_relationship_tables() {
+    let mut f = super::import_tests::fixture(false);
+    let sketch = f.0.get_mut(&8).unwrap();
+    sketch.1 = 4;
+    sketch.2.drain(49..53);
+    let placement = f.0.get_mut(&70).unwrap().3.as_mut().unwrap();
+    let at = placement.len() - 11;
+    placement.splice(at..at, [0; 4]);
+    for (guid, _, bytes, _) in f.0.values_mut() {
+        if matches!(guid.as_str(), entity::POINT | entity::LINE | "F0130424-8B7E-4092-93C9-1CA807482534") {
+            let n = bytes.len();
+            bytes.splice(n - 11..n - 11, [0; 4]);
+        }
+    }
+    let d = f.design();
+    assert_eq!(d.classes.iter().find(|c| c.id == "44A64366-4BD3-4B24-881A-F94C206E8F2D").unwrap().version, 18);
+    let modern = super::import_tests::fixture(false).design();
+    assert_eq!(d.sketch_points().unwrap(), modern.sketch_points().unwrap());
+    assert_eq!(d.sketch_lines().unwrap(), modern.sketch_lines().unwrap());
+    assert_eq!(d.sketch_circles().unwrap(), modern.sketch_circles().unwrap());
+    let doc = d.to_document("Upgraded geometry").unwrap();
+    super::import_tests::volume(&doc, std::f64::consts::PI * 30. * 30. * 17.);
 }

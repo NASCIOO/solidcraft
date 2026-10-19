@@ -478,7 +478,7 @@ pub(super) fn selector(records: &Records<'_>, classes: &BTreeMap<u64, &Class>, i
     if r.u32()? != 2 {
         return Err(invalid("unsupported body-edge selection type"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     let [cached] = cached.as_slice() else { return Err(invalid("circular edge requires one cached curve")) };
     require_class(
@@ -523,7 +523,7 @@ pub(super) fn face_edges(records: &Records<'_>, classes: &BTreeMap<u64, &Class>,
     if r.u32()? != 2 {
         return Err(invalid("unsupported projected face selection type"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     let cached = references(&mut r)?;
     let count = if rectangular { 4 } else { 1 };
     if cached.len() != count || cached.iter().collect::<BTreeSet<_>>().len() != count {

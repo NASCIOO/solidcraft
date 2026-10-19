@@ -146,7 +146,8 @@ fn damaged_projection_relationships_never_fall_back_to_cached_geometry() {
 
 #[test]
 fn legacy_single_component_identity_keeps_projection_ownership_checks() {
-    for version in [18, 23] {
+    // Every observed single-component generation; none carries an assembly.
+    for version in 18..=23 {
         let mut f = projected_circle();
         f.0.get_mut(&3).unwrap().1 = version;
         let mut doc = f.design().to_document("Single root projection").unwrap();
@@ -167,7 +168,7 @@ fn legacy_single_component_identity_keeps_projection_ownership_checks() {
         secondary[n - 10..n - 2].copy_from_slice(&999_u64.to_le_bytes());
         assert!(f.design().to_document("Foreign owner must not flatten").is_err());
     }
-    for version in [0, 17, 19, 24] {
+    for version in [0, 17, 24] {
         let mut f = projected_circle();
         f.0.get_mut(&3).unwrap().1 = version;
         assert!(f.design().to_document("Unknown component generation").is_err());
@@ -185,4 +186,33 @@ fn projection_creation_flag_keeps_links_and_rejects_unknown_values() {
         damaged.0.get_mut(&180).unwrap().2[21] = flag;
         assert!(damaged.design().to_document("Invalid projection flag").is_err());
     }
+}
+
+#[test]
+fn version_3_projections_keep_links_with_either_metadata_length() {
+    let expected = projected_circle().design().to_document("Projection v3").unwrap();
+    let v3 = |metadata: usize| {
+        let mut f = projected_circle();
+        let record = f.0.get_mut(&180).unwrap();
+        record.1 = 3;
+        // Two-byte evaluation state instead of three.
+        record.2.remove(8);
+        let n = record.2.len();
+        let at = n - 11 - 42;
+        match metadata {
+            41 => {
+                record.2.remove(at);
+            }
+            43 => record.2.insert(at, 0),
+            _ => {}
+        }
+        f.design()
+    };
+    for metadata in [41, 42] {
+        assert_eq!(v3(metadata).to_document("Projection v3").unwrap(), expected, "{metadata}");
+    }
+    assert!(v3(43).to_document("Projection v3").is_err());
+    let mut f = projected_circle();
+    f.0.get_mut(&180).unwrap().2.remove(8);
+    assert!(f.design().to_document("Version 4 keeps three evaluation bytes").is_err());
 }

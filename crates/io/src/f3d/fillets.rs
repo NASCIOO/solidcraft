@@ -146,7 +146,7 @@ pub(super) fn edge_with_mode(records: &Records<'_>, classes: &BTreeMap<u64, &Cla
     if r.u32()? != 2 {
         return Err(invalid("unsupported fillet edge selection"));
     }
-    zeros(&mut r, 4)?;
+    super::history::selection_flag(&mut r)?;
     for cached in references(&mut r)? {
         // Fillet selections retain a point cache. Its coordinates never choose
         // the edge: the explicit recipe and producer handle do that below.
