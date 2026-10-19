@@ -27,6 +27,6 @@ sha2 = { workspace = true }
 cadmpeg-core = { workspace = true }
 cadmpeg-ir = { workspace = true }
 cadmpeg-registry = { workspace = true }
-cadmpeg-asm = "=0.6.1"
-cadmpeg-codec-f3d = "=0.6.1"
-cadmpeg-codec-step = "=0.6.1"
+cadmpeg-asm = "=0.6.2"
+cadmpeg-codec-f3d = "=0.6.2"
+cadmpeg-codec-step = "=0.6.2"

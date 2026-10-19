@@ -2,18 +2,11 @@
 use super::*;
 use cadmpeg_codec_f3d::F3dCodec;
 use cadmpeg_codec_step::StepCodec;
+use cadmpeg_ir::CadIr;
 use cadmpeg_ir::codec::write::{EncodeInput, Encoder, target::TargetRequest};
 use cadmpeg_ir::codec::{Codec, DecodeOptions};
+use cadmpeg_ir::scalar::PositiveLength;
 use solidcraft_doc::{Document, Model};
-
-#[path = "solved_archive.rs"]
-mod solved_archive;
-
-fn history_budget(error: &cadmpeg_core::CodecError) -> bool {
-    matches!(error, cadmpeg_core::CodecError::ResourceLimit(limit)
-        if limit.reason == cadmpeg_core::decode::ResourceFailure::BudgetExceeded
-            && matches!(limit.operation, "bind F3D complete history topology work" | "bind F3D complete history topology bytes"))
-}
 
 pub(super) fn recover(bytes: &[u8], name: &str) -> Result<(Document, Vec<String>)> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(bytes, name))).map_err(|_| invalid("native body decoder stopped unexpectedly"))?
@@ -21,28 +14,16 @@ pub(super) fn recover(bytes: &[u8], name: &str) -> Result<(Document, Vec<String>
 
 fn decode(bytes: &[u8], name: &str) -> Result<(Document, Vec<String>)> {
     let mut options = DecodeOptions::default();
-    // Collection accounting counts SAB tokens as well as model entities. The
-    // default 16M rejected the supplied Gridfinity archive before geometry decode.
-    // Keep independent byte/work/depth ceilings; this is not an unlimited retry.
-    options.policy.limits.max_collection_items = 64_000_000;
     options.policy.limits.max_input_bytes = MAX_F3D_BYTES as u64;
     options.policy.limits.max_decompressed_bytes_total = MAX_EXPANDED;
     options.policy.limits.max_retained_bytes = 2 << 30;
     let mut warnings = Vec::new();
-    let decoded = match F3dCodec.decode(&mut Cursor::new(bytes), &options) {
-        Ok(decoded) => decoded,
-        Err(cadmpeg_ir::codec::DecodeFailure::Codec(error)) if history_budget(&error) => {
-            let reduced = solved_archive::without_history(bytes, &options.policy)?;
-            let decoded =
-                F3dCodec.decode(&mut Cursor::new(&reduced), &options).map_err(|e| invalid(&format!("native bodies without history: {e}")))?;
-            warnings.push(format!("Native history exceeded its decoding budget; recovered final body records without historical topology. Editable history was not recovered by this fallback. ({error})"));
-            decoded
-        }
-        Err(error) => return Err(invalid(&format!("native bodies: {error}"))),
-    };
+    let decoded = F3dCodec.decode(&mut Cursor::new(bytes), &options).map_err(|e| invalid(&format!("native bodies: {e}")))?;
     warnings.extend(decoded.report().losses.iter().take(1000).map(|l| format!("Native decoder: {}", l.message)));
+    let (mut ir, _, _) = decoded.into_parts();
+    declare_cache_accuracy(&mut ir);
     let plan = StepCodec::default()
-        .plan(EncodeInput::new(decoded.ir(), None), TargetRequest::Explicit("ap214"))
+        .plan(EncodeInput::new(&ir, None), TargetRequest::Explicit("ap214"))
         .map_err(|e| invalid(&format!("native body conversion: {e}")))?;
     warnings.extend(plan.report().losses.iter().take(1000).map(|l| format!("Body conversion: {}", l.message)));
     let mut step = Vec::new();
@@ -68,26 +49,51 @@ fn decode(bytes: &[u8], name: &str) -> Result<(Document, Vec<String>)> {
     Ok((doc, warnings))
 }
 
+/// Procedural curves and surfaces are written as their cached approximations, which are
+/// only as accurate as their fit tolerance. Declare the model uncertainty accordingly so
+/// the STEP importer does not reject vertices that lie within that tolerance.
+fn declare_cache_accuracy(ir: &mut CadIr) {
+    let curves = ir.model.procedural_curves.iter().filter_map(|c| c.cache_fit_tolerance());
+    let surfaces = ir.model.procedural_surfaces.iter().filter_map(|s| s.cache_fit_tolerance());
+    let fit = curves.chain(surfaces).map(|t| t.get()).filter(|t| t.is_finite()).fold(0., f64::max);
+    if fit > ir.tolerances.linear.get()
+        && let Some(linear) = PositiveLength::new(fit)
+    {
+        ir.tolerances.linear = linear;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cadmpeg_ir::geometry::surface_payloads::LawSurfacePayload;
+    use cadmpeg_ir::geometry::{LawFormula, LawSurfaceConstruction, LawSurfaceTail, LegacyCache, ProceduralSurface, ProceduralSurfaceDefinition};
+    use cadmpeg_ir::ids::ProceduralSurfaceId;
+
+    /// Original synthetic surface whose cached approximation states `fit` mm.
+    fn cached_surface(name: &str, fit: f64) -> ProceduralSurface {
+        let construction = LawSurfaceConstruction {
+            parameter_ranges: None,
+            primary: LawFormula::Null {},
+            additional: Vec::new(),
+            tail: LawSurfaceTail::Full { cache: LegacyCache::try_new(fit).unwrap() },
+            discontinuities: std::array::from_fn(|_| Vec::new()),
+        };
+        let definition = ProceduralSurfaceDefinition::Law(LawSurfacePayload::try_new(Box::new(construction)).unwrap());
+        ProceduralSurface::new(ProceduralSurfaceId::mint(name).unwrap(), definition, None)
+    }
 
     #[test]
-    fn only_historical_topology_budget_refusals_allow_reduced_recovery() {
-        use cadmpeg_core::decode::{ResourceDimension, ResourceFailure, ResourceLimit};
-        for operation in ["bind F3D complete history topology work", "bind F3D complete history topology bytes", "decode geometry"] {
-            for reason in [ResourceFailure::BudgetExceeded, ResourceFailure::AllocationFailed] {
-                let error = cadmpeg_core::CodecError::ResourceLimit(ResourceLimit {
-                    operation,
-                    reason,
-                    dimension: ResourceDimension::Codec(operation),
-                    limit: 100,
-                    used: 100,
-                    additional: 200,
-                });
-                assert_eq!(history_budget(&error), operation != "decode geometry" && reason == ResourceFailure::BudgetExceeded);
-            }
-        }
-        assert!(!history_budget(&cadmpeg_core::CodecError::Malformed("bad record".into())));
+    fn declared_uncertainty_covers_cached_approximations() {
+        let mut ir = CadIr::empty();
+        let model = ir.tolerances.linear.get();
+        declare_cache_accuracy(&mut ir);
+        assert_eq!(ir.tolerances.linear.get(), model, "nothing cached keeps the model tolerance");
+        ir.model.procedural_surfaces.push(cached_surface("synthetic:test:tight#0", model / 10.));
+        declare_cache_accuracy(&mut ir);
+        assert_eq!(ir.tolerances.linear.get(), model, "a tighter cache never lowers it");
+        ir.model.procedural_surfaces.push(cached_surface("synthetic:test:loose#1", 0.0044));
+        declare_cache_accuracy(&mut ir);
+        assert_eq!(ir.tolerances.linear.get(), 0.0044);
     }
 }

@@ -93,7 +93,7 @@ mod convert {
         }
 
         // Decode in memory under the caps.
-        let options = DecodeOptions { container_only: false, policy };
+        let options = DecodeOptions { policy, ..DecodeOptions::default() };
         let decoded = codec.decode(&mut Cursor::new(bytes), &options).map_err(|e| match e {
             DecodeFailure::Codec(e) => format!("{name}: could not read this {format} file: {e}"),
             other => format!("{name}: {other}"),

@@ -19,7 +19,7 @@ are original. The notes identify
 the unused bounding-box field and the version gates for point-data records.
 
 Desktop F3D native-body recovery links `cadmpeg-codec-f3d`,
-`cadmpeg-codec-step`, `cadmpeg-ir`, `cadmpeg-asm` and `cadmpeg-core` 0.6.1
+`cadmpeg-codec-step`, `cadmpeg-ir`, `cadmpeg-asm` and `cadmpeg-core` 0.6.2
 ([cadmpeg contributors](https://github.com/cadmpeg/cadmpeg), Apache-2.0).
 The adapter is original. Transitive compression libraries and their notices are
 included in the generated dependency license inventory. No commercial CAD
@@ -225,7 +225,7 @@ crates/engine/src/tests/gltf_import.rs); no third-party models are committed.
 ## FreeCAD and Rhino import library
 
 FreeCAD `.FCStd` and Rhino `.3dm` files are read with [cadmpeg](https://github.com/cadmpeg/cadmpeg)
-0.6.1 (Apache-2.0), linked as the crates `cadmpeg-core`, `cadmpeg-ir`, `cadmpeg-registry`,
+0.6.2 (Apache-2.0), linked as the crates `cadmpeg-core`, `cadmpeg-ir`, `cadmpeg-registry`,
 `cadmpeg-container`, `cadmpeg-codec-freecad`, `cadmpeg-codec-rhino` and `cadmpeg-codec-step`
 in native builds (`crates/io/src/native_cad.rs`). Only those open-format codecs are built: no
 default features, so cadmpeg's codecs for commercial CAD formats and its ShapeManager/ACIS

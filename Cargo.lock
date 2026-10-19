@@ -593,9 +593,9 @@ checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
 name = "cadmpeg-asm"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2813c4e27045a7c4fc90e6df04447a4d239d1c5cda9925bcffe245198828275d"
+checksum = "f1e30b83e8cc4e3864f2483435e6a5791c48e70a4b6deea0fa15a663f5f8e2ab"
 dependencies = [
  "cadmpeg-core",
  "cadmpeg-ir",
@@ -605,9 +605,9 @@ dependencies = [
 
 [[package]]
 name = "cadmpeg-codec-f3d"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dea294039462c336c2f067fb48076d062712aed06b63752ffaff8e1c3a0e5b7"
+checksum = "54505b952b9cda11a1a8bd98fc4acf54a92e5b7efc83f549877b6632d9296cbd"
 dependencies = [
  "cadmpeg-asm",
  "cadmpeg-container",
@@ -622,14 +622,14 @@ dependencies = [
  "serde_json",
  "sha2 0.11.1",
  "tempfile",
- "zip 8.6.0",
+ "zip 9.0.5",
 ]
 
 [[package]]
 name = "cadmpeg-codec-freecad"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a5257265c2549cf59a8457b3c7aadcc96c95abe20205232553766993a808812"
+checksum = "9bf328b7680b9054a18eea826ea099a9eedf8d50b8d8dd045a1dadfe35999cff"
 dependencies = [
  "cadmpeg-container",
  "cadmpeg-core",
@@ -638,14 +638,14 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
- "zip 8.6.0",
+ "zip 9.0.5",
 ]
 
 [[package]]
 name = "cadmpeg-codec-rhino"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d88b42fb91c7e5af4c75c0433029771f7e3233a0b72ec3d0b2e5ff2c72bed07"
+checksum = "701ee0f79fdf1b09c08ee169ce00ddb00c1d66d697badfaf2af79728c7b7d52c"
 dependencies = [
  "cadmpeg-container",
  "cadmpeg-core",
@@ -662,38 +662,39 @@ dependencies = [
 
 [[package]]
 name = "cadmpeg-codec-step"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e83a52258c129a683f77fb360ca30af54ae34339625ad890be12621128a5811c"
+checksum = "08a9fe6b93af35c22b56cceccca9a8668dd1564e6544b8184c94d8b0d24a5ab5"
 dependencies = [
  "base64",
  "cadmpeg-container",
  "cadmpeg-core",
  "cadmpeg-ir",
  "encoding_rs",
+ "serde",
  "serde_json",
  "thiserror 2.0.21",
- "zip 8.6.0",
+ "zip 9.0.5",
 ]
 
 [[package]]
 name = "cadmpeg-container"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c110508cd9155e905f52906de505dfd42dc70a0321f5e90b5f68c28ba207686e"
+checksum = "57950ab1450471cd674c635b00b18686e7f55366a6cf9961dabfc33fc6e420fb"
 dependencies = [
  "cadmpeg-core",
  "crc32fast",
  "flate2",
- "zip 8.6.0",
- "zstd 0.14.2",
+ "zip 9.0.5",
+ "zstd",
 ]
 
 [[package]]
 name = "cadmpeg-core"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21b1147e51a74e7c52da5b393a0344597238cdc622fac6443eb2fd526759f6fa"
+checksum = "45eac6de0b68d8ae9baf43e5f04780cc153100597ce73bd636c85b2059fee1bd"
 dependencies = [
  "flate2",
  "memchr",
@@ -701,14 +702,14 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "zstd 0.14.2",
+ "zstd",
 ]
 
 [[package]]
 name = "cadmpeg-ir"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71ff19f019f013d97e353bb802c5d2e253c2859aaa5422009aa933dc2f2e7dbc"
+checksum = "2cc818eeac208c9d09dc3a4f5ce4c431fe26acfab79ceb4a0a1570e03ff8bd55"
 dependencies = [
  "base64",
  "cadmpeg-core",
@@ -721,9 +722,9 @@ dependencies = [
 
 [[package]]
 name = "cadmpeg-protein"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6356e0859ba89925fc23dc9725f981280ab9f97a48faf91a2c980f3637d3eebf"
+checksum = "a12ffec0cd60836f7d6dd7662f4d1f21ac3f88fa03bdc29a0659fe5bdc6226e8"
 dependencies = [
  "cadmpeg-container",
  "cadmpeg-core",
@@ -731,14 +732,14 @@ dependencies = [
  "flate2",
  "roxmltree",
  "serde",
- "zip 8.6.0",
+ "zip 9.0.5",
 ]
 
 [[package]]
 name = "cadmpeg-registry"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66046f1a694926707bea8944f861e699964b04c68972708588f97e14ccee3c5d"
+checksum = "6952e28b9491c654f66bd317d30eeec83b6a78e12804097e42b7d640a09cce09"
 dependencies = [
  "cadmpeg-codec-freecad",
  "cadmpeg-codec-rhino",
@@ -2607,6 +2608,18 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
+dependencies = [
+ "bitflags 2.13.2",
+ "cfg-if",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -5896,7 +5909,7 @@ dependencies = [
  "futures-sink",
  "futures-util",
  "hex",
- "nix",
+ "nix 0.29.0",
  "ordered-stream",
  "rand 0.8.8",
  "serde",
@@ -6152,16 +6165,17 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "8.6.0"
+version = "9.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "crc32fast",
  "flate2",
  "indexmap",
  "memchr",
+ "nix 0.31.3",
  "typed-path",
- "zstd 0.13.3",
+ "zstd",
 ]
 
 [[package]]
@@ -6190,29 +6204,11 @@ dependencies = [
 
 [[package]]
 name = "zstd"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
-dependencies = [
- "zstd-safe 7.3.0",
-]
-
-[[package]]
-name = "zstd"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "057cfd910cfac363a0ada849592624b4c9ff2e10bef504c3433810d78ed96f93"
 dependencies = [
- "zstd-safe 8.1.0",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "7.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882"
-dependencies = [
- "zstd-sys",
+ "zstd-safe",
 ]
 
 [[package]]

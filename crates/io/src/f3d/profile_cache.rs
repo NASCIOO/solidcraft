@@ -61,10 +61,9 @@ fn resolve_inner(design: &Design, profile: u64, geometry: u64, curves: &BTreeMap
     let arena = DecodeArena::new();
     let mut policy = DecodePolicy::service();
     policy.limits.max_input_bytes = MAX_STREAM as u64;
-    policy.limits.max_collection_items = 2_000_000;
     policy.limits.max_retained_bytes = 256 << 20;
     let (ctx, _) = DecodeContext::from_root_bytes(&bytes, &arena, &policy).map_err(|e| invalid(&e.to_string()))?;
-    let header = asm_header::parse(&ctx, &bytes).map_err(|e| invalid(&e.to_string()))?.ok_or_else(|| invalid("missing snapshot ASM header"))?;
+    let header = asm_header::parse(&bytes).ok_or_else(|| invalid("missing snapshot ASM header"))?;
     if header.metadata.has_history_partition() || header.metadata.entity_count != Some(count as u64 + 1) {
         return Err(invalid("snapshot root count disagrees with its identity table"));
     }
