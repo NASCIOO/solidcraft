@@ -93,7 +93,7 @@ jobs:
     # approved-for-ci either (the same skip, for the same reason).
     if: (github.event_name != 'pull_request' || !github.event.pull_request.draft) && (github.event.action != 'labeled' || github.event.label.name == 'approved-for-ci')
     # Trusted runs (see the top of this file) use the self-hosted runners.
-    runs-on: ${{ (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'self-hosted-light' || 'ubuntu-24.04' }}
+    runs-on: ${{ (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'self-hosted-light' || 'ubuntu-24.04' }}
     permissions:
       contents: read
       # To ask whether the merge queue already tested a commit pushed to main.
@@ -223,7 +223,7 @@ jobs:
   checks:
     name: Format and repository checks
     if: (github.event_name != 'pull_request' || !github.event.pull_request.draft) && (github.event.action != 'labeled' || github.event.label.name == 'approved-for-ci')
-    runs-on: ${{ (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && 'self-hosted-fast' || 'ubuntu-24.04' }}
+    runs-on: ${{ (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && 'self-hosted-fast' || 'ubuntu-24.04' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
