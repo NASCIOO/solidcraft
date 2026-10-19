@@ -549,15 +549,13 @@ pub fn read_design_file(path: &str, notify: Option<impl FnOnce(DesignPreview)>) 
     source.seek(SeekFrom::Start(0)).map_err(invalid)?;
     if is_design_container(&prefix) {
         let mut reader = DesignContainerReader::new(source)?;
-        // The model is read once: for the picture and for the session.
+        // A design with its model opens without a picture first: the model is the session.
         let model = reader.geometry();
-        if let Some(notify) = notify {
-            let document = reader.reader.document(16 << 20).ok();
-            let preview =
-                read_preview(&mut reader.reader).ok().or_else(|| native_cache::geometry_preview(document.as_deref()?, model.as_ref()?).ok());
-            if let Some(preview) = preview {
-                notify(preview);
-            }
+        if let Some(notify) = notify
+            && model.is_none()
+            && let Ok(preview) = read_preview(&mut reader.reader)
+        {
+            notify(preview);
         }
         Ok((reader.read_document()?, model))
     } else {

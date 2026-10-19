@@ -1018,7 +1018,8 @@ mod tests {
         for x in [0, 20, 40] {
             s.execute("solid.box", &json!({"length":10,"width":10,"height":10,"corner":[x,0,0]})).unwrap();
         }
-        s.execute("file.save", &json!({"path":path})).unwrap();
+        // Without its model: the timeline is evaluated (and watched) as it opens.
+        s.execute("file.save", &json!({"path":path, "cache": false})).unwrap();
 
         let progress = Arc::new(Progress::default());
         let mut opened = Session::default();
