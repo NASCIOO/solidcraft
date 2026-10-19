@@ -104,7 +104,10 @@ fn corpus_designs_open_from_their_model_as_evaluated() {
     for p in corpus() {
         let name = p.file_stem().unwrap_or_default().to_string_lossy().to_string();
         let s = open(&p);
-        if s.model.results.iter().any(|r| r.error.is_some()) || name == "naming-split-pieces" {
+        // Names saved before format 14 are found again through names worked out from geometry on
+        // demand, which a saved model does not keep.
+        let legacy = s.doc.to_json().contains(&format!("\"{}", solidcraft_engine::doc::naming::LEGACY_MARK));
+        if s.model.results.iter().any(|r| r.error.is_some()) || legacy {
             // Not kept: a model with errors, or names saved before format 14.
             let path = temp(&name);
             let mut s = s;
