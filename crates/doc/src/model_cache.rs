@@ -21,6 +21,8 @@ pub struct SavedModel {
 
 /// Records refer to these at most.
 const MAX_ITEMS: usize = 1_000_000;
+/// Bodies and sketches all the states hold together, at most (a state is a list of clones).
+const MAX_HELD: usize = 50_000_000;
 
 fn hex(v: u64) -> String {
     format!("{v:016x}")
@@ -45,11 +47,61 @@ fn has_legacy_names(doc: &Document) -> bool {
     })
 }
 
+/// What tells two model bodies apart in a record: a body a feature passes through unchanged is a
+/// clone sharing its mesh cell and names, so this finds it without writing its record again.
+#[derive(PartialEq, Eq, Hash)]
+struct BodyKey {
+    mesh: usize,
+    names: usize,
+    imported: usize,
+    key: u64,
+    feature: u64,
+    component: u64,
+    transferred: bool,
+    name: String,
+    source_name: Option<String>,
+    source_transform: [u64; 16],
+}
+
+impl BodyKey {
+    fn of(b: &ModelBody) -> Self {
+        let mut source_transform = [0; 16];
+        for (bits, v) in source_transform.iter_mut().zip(b.source_transform.iter().flatten()) {
+            *bits = v.to_bits();
+        }
+        BodyKey {
+            mesh: Arc::as_ptr(&b.mesh) as usize,
+            names: b.names.id(),
+            imported: b.imported.as_ref().map_or(0, |l| Arc::as_ptr(l) as usize),
+            key: b.key,
+            feature: b.feature,
+            component: b.component,
+            transferred: b.transferred,
+            name: b.name.clone(),
+            source_name: b.source_name.clone(),
+            source_transform,
+        }
+    }
+}
+
+/// Indices as runs of consecutive ones (`[first, count]`): a state lists mostly the bodies of the
+/// state before it, in order.
+fn runs(indices: &[usize]) -> Vec<[usize; 2]> {
+    let mut out: Vec<[usize; 2]> = Vec::new();
+    for &i in indices {
+        match out.last_mut() {
+            Some([first, count]) if *first + *count == i => *count += 1,
+            _ => out.push([i, 1]),
+        }
+    }
+    out
+}
+
 #[derive(Default)]
 struct Writer {
     bodies: Vec<Body>,
     model_bodies: Vec<Json>,
-    model_body_index: HashMap<(usize, String), usize>,
+    model_body_index: HashMap<BodyKey, usize>,
     names: Vec<Json>,
     names_index: HashMap<usize, usize>,
     sketches: Vec<Json>,
@@ -75,6 +127,10 @@ impl Writer {
         if b.body.is_mesh() {
             return None;
         }
+        let key = BodyKey::of(b);
+        if let Some(i) = self.model_body_index.get(&key) {
+            return Some(*i);
+        }
         let names = self.names(b);
         let mut r = json!({
             "name": b.name, "feature": b.feature, "component": b.component, "key": hex(b.key), "names": names,
@@ -94,11 +150,6 @@ impl Writer {
         if let Some(look) = &b.imported {
             let faces: Vec<Json> = look.faces.iter().map(|(name, (color, opacity))| json!([name, color, opacity])).collect();
             r["imported"] = json!({"color": look.color, "opacity": look.opacity, "faces": faces});
-        }
-        // Clones of one body share its mesh cell: the same body in every state that holds it.
-        let key = (Arc::as_ptr(&b.mesh) as usize, r.to_string());
-        if let Some(i) = self.model_body_index.get(&key) {
-            return Some(*i);
         }
         r["body"] = json!(self.bodies.len());
         self.bodies.push(b.body.clone());
@@ -129,7 +180,7 @@ impl Writer {
         let bodies = st.bodies.iter().map(|b| self.model_body(b)).collect::<Option<Vec<_>>>()?;
         let sketches = st.sketches.iter().map(|s| self.sketch(s)).collect::<Option<Vec<_>>>()?;
         let r = json!({
-            "bodies": bodies, "sketches": sketches, "body_counter": st.body_counter,
+            "bodies": runs(&bodies), "sketches": runs(&sketches), "body_counter": st.body_counter,
             "sheets": serde_json::to_value(&st.sheets).ok()?, "construct": serde_json::to_value(&st.construct).ok()?,
             "threads": serde_json::to_value(&st.threads).ok()?,
             "sketch_keys": st.sketch_keys.iter().map(|(f, k)| json!([f, hex(*k)])).collect::<Vec<_>>(),
@@ -241,9 +292,20 @@ impl SavedModel {
             model_bodies.push(b);
         }
         let mut states = Vec::new();
+        let mut held = 0usize;
         for s in list("states")? {
+            // Runs of consecutive indices, each within the list it indexes.
             let ids = |key: &str, len: usize| -> Result<Vec<usize>> {
-                s.get(key).and_then(Json::as_array).ok_or_else(|| bad("saved model: state"))?.iter().map(|i| index(Some(i), len)).collect()
+                let mut out = Vec::new();
+                for run in s.get(key).and_then(Json::as_array).ok_or_else(|| bad("saved model: state"))? {
+                    let first = index(run.get(0), len)?;
+                    let count = run.get(1).and_then(Json::as_u64).and_then(|n| usize::try_from(n).ok()).ok_or_else(|| bad("saved model: run"))?;
+                    if first.checked_add(count).is_none_or(|end| end > len) || out.len().saturating_add(count) > MAX_ITEMS {
+                        return Err(bad("saved model: run"));
+                    }
+                    out.extend(first..first + count);
+                }
+                Ok(out)
             };
             let field = |key: &str| parse(s.get(key));
             let invalid = |_| bad("saved model: state");
@@ -264,6 +326,10 @@ impl SavedModel {
                 fitted: serde_json::from_value(field("fitted")?).map_err(invalid)?,
                 tapered: serde_json::from_value(field("tapered")?).map_err(invalid)?,
             };
+            held = held.saturating_add(st.bodies.len()).saturating_add(st.sketches.len());
+            if held > MAX_HELD {
+                return Err(bad("saved model: states"));
+            }
             states.push(Arc::new(st));
         }
         Ok(states)

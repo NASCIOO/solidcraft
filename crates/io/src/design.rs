@@ -711,7 +711,7 @@ mod tests {
             .map(|i| json!({"name": format!("Body{i}"), "feature": 1, "component": 0, "key": "0000000000000001", "names": 0, "body": i}))
             .collect();
         let state = json!({
-            "bodies": (0..bodies.len()).collect::<Vec<_>>(), "sketches": [], "body_counter": 7, "sheets": [], "construct": [], "threads": [],
+            "bodies": [[0, bodies.len()]], "sketches": [], "body_counter": 7, "sheets": [], "construct": [], "threads": [],
             "sketch_keys": [], "blend_edges": {}, "fitted": {}, "tapered": {},
         });
         solidcraft_doc::SavedModel {
