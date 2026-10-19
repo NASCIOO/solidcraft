@@ -171,7 +171,6 @@ impl Model {
         })
         .ok()
     }
-
 }
 
 impl SavedModel {
@@ -182,7 +181,8 @@ impl SavedModel {
         let index = |v: Option<&Json>, len: usize| {
             v.and_then(Json::as_u64).and_then(|i| usize::try_from(i).ok()).filter(|i| *i < len).ok_or_else(|| bad("saved model: index"))
         };
-        let text = |v: Option<&Json>| v.and_then(Json::as_str).filter(|s| s.len() <= 1 << 16).map(str::to_owned).ok_or_else(|| bad("saved model: text"));
+        let text =
+            |v: Option<&Json>| v.and_then(Json::as_str).filter(|s| s.len() <= 1 << 16).map(str::to_owned).ok_or_else(|| bad("saved model: text"));
         let parse = |v: Option<&Json>| v.cloned().ok_or_else(|| bad("saved model: missing"));
         let mut names = Vec::new();
         for n in list("names")? {
@@ -211,11 +211,16 @@ impl SavedModel {
         let mut model_bodies = Vec::new();
         for r in list("model_bodies")? {
             let body = bodies.get(index(r.get("body"), bodies.len())?).cloned().ok_or_else(|| bad("saved model: body"))?;
-            let mut b = ModelBody::new(text(r.get("name"))?, body, r.get("feature").and_then(Json::as_u64).ok_or_else(|| bad("saved model: feature"))?);
+            let mut b =
+                ModelBody::new(text(r.get("name"))?, body, r.get("feature").and_then(Json::as_u64).ok_or_else(|| bad("saved model: feature"))?);
             b.component = r.get("component").and_then(Json::as_u64).ok_or_else(|| bad("saved model: component"))?;
             b.key = unhex(r.get("key").unwrap_or(&Json::Null))?;
-            let depth = r.get("depth").map(|d| d.as_u64().and_then(|d| usize::try_from(d).ok()).ok_or_else(|| bad("saved model: depth"))).transpose()?;
-            b.names = crate::naming::NameCell::saved(names.get(index(r.get("names"), names.len())?).cloned().ok_or_else(|| bad("saved model: names"))?, depth);
+            let depth =
+                r.get("depth").map(|d| d.as_u64().and_then(|d| usize::try_from(d).ok()).ok_or_else(|| bad("saved model: depth"))).transpose()?;
+            b.names = crate::naming::NameCell::saved(
+                names.get(index(r.get("names"), names.len())?).cloned().ok_or_else(|| bad("saved model: names"))?,
+                depth,
+            );
             b.source_name = r.get("source_name").map(|s| text(Some(s))).transpose()?;
             if let Some(m) = r.get("source_transform") {
                 let m: crate::Mat = serde_json::from_value(m.clone()).map_err(|_| bad("saved model: transform"))?;
@@ -253,7 +258,8 @@ impl SavedModel {
             st.fitted = serde_json::from_value(field("fitted")?).map_err(invalid)?;
             st.tapered = serde_json::from_value(field("tapered")?).map_err(invalid)?;
             for k in s.get("sketch_keys").and_then(Json::as_array).ok_or_else(|| bad("saved model: state"))? {
-                st.sketch_keys.insert(k.get(0).and_then(Json::as_u64).ok_or_else(|| bad("saved model: state"))?, unhex(k.get(1).unwrap_or(&Json::Null))?);
+                st.sketch_keys
+                    .insert(k.get(0).and_then(Json::as_u64).ok_or_else(|| bad("saved model: state"))?, unhex(k.get(1).unwrap_or(&Json::Null))?);
             }
             states.push(Arc::new(st));
         }
@@ -267,7 +273,12 @@ impl SavedModel {
         let features = self.records.get("features").and_then(Json::as_array).ok_or_else(|| bad("saved model: features"))?;
         let last = features.iter().rev().find(|f| f.get("skipped").and_then(Json::as_bool) == Some(false));
         match last {
-            Some(f) => f.get("state").and_then(Json::as_u64).and_then(|i| states.get(usize::try_from(i).ok()?)).cloned().ok_or_else(|| bad("saved model: state")),
+            Some(f) => f
+                .get("state")
+                .and_then(Json::as_u64)
+                .and_then(|i| states.get(usize::try_from(i).ok()?))
+                .cloned()
+                .ok_or_else(|| bad("saved model: state")),
             None => Ok(Arc::new(ModelState::default())),
         }
     }
@@ -283,7 +294,8 @@ impl Model {
         let index = |v: Option<&Json>, len: usize| {
             v.and_then(Json::as_u64).and_then(|i| usize::try_from(i).ok()).filter(|i| *i < len).ok_or_else(|| bad("saved model: index"))
         };
-        let text = |v: Option<&Json>| v.and_then(Json::as_str).filter(|s| s.len() <= 1 << 16).map(str::to_owned).ok_or_else(|| bad("saved model: text"));
+        let text =
+            |v: Option<&Json>| v.and_then(Json::as_str).filter(|s| s.len() <= 1 << 16).map(str::to_owned).ok_or_else(|| bad("saved model: text"));
         let features = records.get("features").and_then(Json::as_array).ok_or_else(|| bad("saved model: features"))?;
         if features.len() != doc.features.len() {
             return Err(bad("saved model: features"));

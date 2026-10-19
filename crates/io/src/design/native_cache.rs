@@ -120,7 +120,11 @@ pub(super) fn read_geometry_with<R: Read + Seek>(reader: &mut PackageReader<R>, 
         return Err(invalid("model cache payload key"));
     }
     let count = |v: Option<&Value>| v.and_then(Value::as_u64).and_then(|n| usize::try_from(n).ok()).ok_or_else(|| invalid("model cache number"));
-    let slices = manifest.get("slices").and_then(Value::as_array).filter(|b| !b.is_empty() && b.len() <= MAX_UNIQUE).ok_or_else(|| invalid("cached bodies"))?;
+    let slices = manifest
+        .get("slices")
+        .and_then(Value::as_array)
+        .filter(|b| !b.is_empty() && b.len() <= MAX_UNIQUE)
+        .ok_or_else(|| invalid("cached bodies"))?;
     let mut end = 0usize;
     let mut parts = Vec::with_capacity(slices.len());
     for s in slices {
@@ -145,7 +149,11 @@ pub(super) fn read_geometry_with<R: Read + Seek>(reader: &mut PackageReader<R>, 
         .iter()
         .map(|i| Ok(solidcraft_kernel::DisplayShare::new(body(Some(i))?.clone())))
         .collect::<Result<Vec<_>>>()?;
-    let table = manifest.get("bodies").and_then(Value::as_array).filter(|s| !s.is_empty() && s.len() <= MAX_RECORDS).ok_or_else(|| invalid("cached body table"))?;
+    let table = manifest
+        .get("bodies")
+        .and_then(Value::as_array)
+        .filter(|s| !s.is_empty() && s.len() <= MAX_RECORDS)
+        .ok_or_else(|| invalid("cached body table"))?;
     let mut bodies = Vec::with_capacity(table.len());
     for entry in table {
         let mut b = body(entry.get(0))?.clone();

@@ -4418,10 +4418,10 @@ fn replay(
     Ok(())
 }
 
-#[path = "eval_more.rs"]
-mod more;
 #[path = "model_cache.rs"]
 mod model_cache;
+#[path = "eval_more.rs"]
+mod more;
 pub use model_cache::SavedModel;
 #[path = "eval_surface.rs"]
 mod surface;

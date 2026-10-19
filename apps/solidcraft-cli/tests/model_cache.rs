@@ -148,3 +148,41 @@ fn imported_assemblies_open_from_their_model_as_evaluated() {
     let _ = std::fs::remove_file(&step);
     check("imported hinge", s);
 }
+
+/// Opened from its model, a design evaluates only from the first feature an edit changes: the
+/// saved states before it are kept as they were read (the same states, not evaluated again).
+#[test]
+fn an_edit_after_opening_evaluates_from_the_feature_it_changes() {
+    let plate = solidcraft_engine::sample::samples().into_iter().find(|s| s.name == "Sample Plate").unwrap();
+    let mut built = Session::default();
+    for c in (plate.script)()["commands"].as_array().unwrap() {
+        built.execute(c["command"].as_str().unwrap(), &c["params"]).unwrap();
+    }
+    let path = temp("incremental");
+    built.execute("file.save_as", &json!({"path": path.to_string_lossy()})).unwrap();
+    let n = built.doc.features.len();
+    assert!(n >= 4);
+    let mut s = open(&path);
+    assert_eq!(s.model.last_recomputed, 0);
+    let read: Vec<Arc<ModelState>> = s.model.results.iter().map(|r| r.state.clone()).collect();
+    // How many of the first features still have the states read from the file.
+    let kept = |s: &Session| s.model.results.iter().zip(&read).take_while(|(r, st)| Arc::ptr_eq(&r.state, st)).count();
+    // The marker moved back and forth: the features before it are as read.
+    s.execute("timeline.rollback", &json!({"position": n - 2})).unwrap();
+    assert_eq!(kept(&s), n - 2, "rolled back");
+    s.execute("timeline.rollback", &json!({})).unwrap();
+    assert_eq!(kept(&s), n - 2);
+    // Suppressing the second-to-last feature keeps every state before it.
+    let k = s.doc.features[n - 2].id;
+    s.execute("timeline.suppress", &json!({"feature": k, "suppressed": true})).unwrap();
+    assert_eq!(kept(&s), n - 2, "evaluated from the suppressed feature on");
+    s.execute("edit.undo", &json!({})).unwrap();
+    // A new feature at the end starts from the final state read from the file.
+    let mut s = open(&path);
+    let read: Vec<Arc<ModelState>> = s.model.results.iter().map(|r| r.state.clone()).collect();
+    s.execute("solid.box", &json!({"length": 3, "width": 3, "height": 3, "operation": "new"})).unwrap();
+    assert_eq!(s.model.results.len(), n + 1);
+    assert!(s.model.results.iter().zip(&read).all(|(r, st)| Arc::ptr_eq(&r.state, st)), "only the new feature evaluated");
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(format!("{}.bak", path.display()));
+}

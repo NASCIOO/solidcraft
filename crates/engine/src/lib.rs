@@ -356,9 +356,9 @@ impl Session {
         // The session keeps what is hidden (not an undo step); the design file carries it.
         let visibility = std::mem::take(&mut doc.visibility);
         let doc = Arc::new(doc);
-        let adopted = saved.filter(|_| solidcraft_geom::env::var_os("SOLIDCRAFT_NO_MODEL_CACHE").is_none()).and_then(|saved| {
-            Model::adopt(&doc, saved).map_err(|e| log::info!("the saved model is not used: {e}")).ok()
-        });
+        let adopted = saved
+            .filter(|_| solidcraft_geom::env::var_os("SOLIDCRAFT_NO_MODEL_CACHE").is_none())
+            .and_then(|saved| Model::adopt(&doc, saved).map_err(|e| log::info!("the saved model is not used: {e}")).ok());
         let model = adopted.unwrap_or_else(|| {
             let mut model = Model::new();
             model.evaluate(&doc);

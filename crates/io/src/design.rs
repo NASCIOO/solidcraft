@@ -553,9 +553,8 @@ pub fn read_design_file(path: &str, notify: Option<impl FnOnce(DesignPreview)>) 
         let model = reader.geometry();
         if let Some(notify) = notify {
             let document = reader.reader.document(16 << 20).ok();
-            let preview = read_preview(&mut reader.reader)
-                .ok()
-                .or_else(|| native_cache::geometry_preview(document.as_deref()?, model.as_ref()?).ok());
+            let preview =
+                read_preview(&mut reader.reader).ok().or_else(|| native_cache::geometry_preview(document.as_deref()?, model.as_ref()?).ok());
             if let Some(preview) = preview {
                 notify(preview);
             }
