@@ -207,9 +207,6 @@ impl<'a> Reader<'a> {
     fn count(&mut self, width: usize) -> Result<usize> {
         let count = self.u32()? as usize;
         if count > MAX_ITEMS || count > self.bytes.len().saturating_sub(self.at) / width.max(1) {
-            if std::env::var("F3D_DBG").is_ok() {
-                eprintln!("DBGC at {} count {count} tag {:?}\n{}", self.at, self.bytes.get(..20), std::backtrace::Backtrace::force_capture());
-            }
             return Err(invalid("invalid or excessive item count"));
         }
         Ok(count)
